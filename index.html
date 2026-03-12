@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>數學太空射擊</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0e27;
+  color: #fff;
+  font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+/* Stars background */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background:
+    radial-gradient(1px 1px at 10% 20%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 30% 60%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 50% 10%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 70% 80%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 90% 40%, #fff 1px, transparent 0),
+    radial-gradient(1.5px 1.5px at 15% 85%, #aaf 1px, transparent 0),
+    radial-gradient(1.5px 1.5px at 55% 45%, #aaf 1px, transparent 0),
+    radial-gradient(1px 1px at 80% 15%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 25% 35%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 65% 70%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 45% 90%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 5% 50%, #fff 1px, transparent 0),
+    radial-gradient(1.5px 1.5px at 85% 55%, #ccf 1px, transparent 0),
+    radial-gradient(1px 1px at 35% 5%, #fff 1px, transparent 0),
+    radial-gradient(1px 1px at 75% 25%, #fff 1px, transparent 0);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Top bar */
+#top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: rgba(0,0,0,0.5);
+  border-bottom: 2px solid #334;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+#top-bar span {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+#score { color: #ffd700; }
+#level-display { color: #7df; }
+#hp { font-size: 1.8em; letter-spacing: 4px; }
+
+/* Game area */
+#game-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  min-height: 300px;
+}
+
+/* Player ship */
+#player {
+  position: absolute;
+  left: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 4em;
+  filter: drop-shadow(0 0 10px #4af);
+  z-index: 5;
+  transition: top 0.3s;
+}
+
+/* Enemy */
+#enemy {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: right 0s;
+}
+
+#enemy.moving {
+  transition: right 0.1s linear;
+}
+
+#enemy-emoji {
+  font-size: 3.5em;
+  filter: drop-shadow(0 0 8px #f44);
+}
+
+#enemy-problem {
+  background: rgba(0,0,0,0.7);
+  border: 3px solid #f80;
+  border-radius: 16px;
+  padding: 12px 20px;
+  font-size: 2.2em;
+  font-weight: bold;
+  color: #fff;
+  white-space: nowrap;
+  text-shadow: 0 0 10px #f80;
+}
+
+/* Bullet */
+.bullet {
+  position: absolute;
+  width: 30px;
+  height: 6px;
+  background: linear-gradient(to right, #4af, #fff);
+  border-radius: 3px;
+  z-index: 4;
+  box-shadow: 0 0 10px #4af, 0 0 20px #4af;
+}
+
+.bullet.miss {
+  background: linear-gradient(to right, #f44, #f88);
+  box-shadow: 0 0 10px #f44;
+  opacity: 0.6;
+}
+
+/* Explosion */
+.explosion {
+  position: absolute;
+  z-index: 10;
+  font-size: 5em;
+  animation: explode 0.6s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes explode {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
+}
+
+/* Feedback text */
+.feedback {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 3em;
+  font-weight: bold;
+  z-index: 20;
+  pointer-events: none;
+  animation: feedbackAnim 1s ease-out forwards;
+}
+
+.feedback.correct { color: #4f4; text-shadow: 0 0 20px #4f4; }
+.feedback.wrong { color: #f44; text-shadow: 0 0 20px #f44; }
+.feedback.levelup {
+  color: #ffd700;
+  text-shadow: 0 0 30px #ffd700;
+  font-size: 3.5em;
+  animation: levelUpAnim 1.5s ease-out forwards;
+}
+
+@keyframes feedbackAnim {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.8); }
+  50% { transform: translate(-50%, -50%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
+}
+
+@keyframes levelUpAnim {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+  30% { transform: translate(-50%, -50%) scale(1.3); }
+  70% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
+}
+
+/* HP loss flash */
+.hp-loss-flash {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 0, 0, 0.3);
+  z-index: 15;
+  pointer-events: none;
+  animation: hpFlash 0.5s ease-out forwards;
+}
+
+@keyframes hpFlash {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Answer buttons */
+#answer-bar {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 16px 24px;
+  background: rgba(0,0,0,0.6);
+  border-top: 2px solid #334;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.answer-btn {
+  flex: 1;
+  max-width: 250px;
+  min-height: 80px;
+  font-size: 2em;
+  font-weight: bold;
+  border: 3px solid #556;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #2a3060, #1a2040);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.answer-btn:hover {
+  background: linear-gradient(180deg, #3a4080, #2a3060);
+  border-color: #88f;
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(100, 100, 255, 0.4);
+}
+
+.answer-btn:active {
+  transform: scale(0.97);
+}
+
+.answer-btn.correct-flash {
+  background: linear-gradient(180deg, #2a8040, #1a6030) !important;
+  border-color: #4f4 !important;
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.5) !important;
+}
+
+.answer-btn.wrong-flash {
+  background: linear-gradient(180deg, #802a2a, #601a1a) !important;
+  border-color: #f44 !important;
+  animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+/* Game over overlay */
+#overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+#overlay.show { display: flex; }
+
+#overlay h1 {
+  font-size: 4em;
+  color: #f44;
+  text-shadow: 0 0 30px #f44;
+}
+
+#overlay .final-score {
+  font-size: 2em;
+  color: #ffd700;
+}
+
+#overlay .final-level {
+  font-size: 1.5em;
+  color: #7df;
+}
+
+#play-again-btn {
+  margin-top: 20px;
+  padding: 16px 48px;
+  font-size: 2em;
+  font-weight: bold;
+  border: 3px solid #4f4;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #2a6040, #1a4030);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+#play-again-btn:hover {
+  background: linear-gradient(180deg, #3a8050, #2a6040);
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
+}
+
+/* Start screen */
+#start-screen {
+  display: flex;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 20, 0.95);
+  z-index: 200;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+#start-screen.hide { display: none; }
+
+#start-screen h1 {
+  font-size: 3.5em;
+  color: #ffd700;
+  text-shadow: 0 0 30px #ffd700;
+}
+
+#start-screen p {
+  font-size: 1.4em;
+  color: #aac;
+  max-width: 500px;
+  text-align: center;
+  line-height: 1.6;
+}
+
+#start-btn {
+  margin-top: 10px;
+  padding: 16px 48px;
+  font-size: 2.2em;
+  font-weight: bold;
+  border: 3px solid #ffd700;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #4a3010, #2a2000);
+  color: #ffd700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+#start-btn:hover {
+  background: linear-gradient(180deg, #6a4020, #4a3010);
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
+}
+
+/* Disable buttons during bullet animation */
+.buttons-disabled .answer-btn {
+  pointer-events: none;
+  opacity: 0.5;
+}
+</style>
+</head>
+<body>
+
+<!-- Start Screen -->
+<div id="start-screen">
+  <h1>🚀 數學太空射擊 🛸</h1>
+  <p>外星人入侵了！<br>算出正確答案來發射子彈消滅它們！</p>
+  <button id="start-btn" onclick="startGame()">開始遊戲</button>
+</div>
+
+<!-- Top Bar -->
+<div id="top-bar">
+  <span id="score">分數：0</span>
+  <span id="level-display">等級：1</span>
+  <span id="hp">❤️❤️❤️</span>
+</div>
+
+<!-- Game Area -->
+<div id="game-area">
+  <div id="player">🚀</div>
+  <div id="enemy">
+    <div id="enemy-problem">1 + 1 = ?</div>
+    <div id="enemy-emoji">👾</div>
+  </div>
+</div>
+
+<!-- Answer Buttons -->
+<div id="answer-bar">
+  <button class="answer-btn" id="btn0"></button>
+  <button class="answer-btn" id="btn1"></button>
+  <button class="answer-btn" id="btn2"></button>
+</div>
+
+<!-- Game Over -->
+<div id="overlay">
+  <h1>遊戲結束</h1>
+  <div class="final-score" id="final-score">分數：0</div>
+  <div class="final-level" id="final-level">最高等級：1</div>
+  <button id="play-again-btn" onclick="startGame()">再玩一次</button>
+</div>
+
+<script>
+// Game state
+let score = 0;
+let level = 1;
+let hp = 3;
+let correctCount = 0; // count within current level
+let currentAnswer = 0;
+let enemyX = 0; // percentage from right
+let enemyMoveInterval = null;
+let gameActive = false;
+let buttonsLocked = false;
+
+const enemyEmojis = ['👾', '👽', '🛸', '🤖', '👹', '💀', '🐙', '🦑'];
+
+// DOM elements
+const scoreEl = document.getElementById('score');
+const levelEl = document.getElementById('level-display');
+const hpEl = document.getElementById('hp');
+const enemyEl = document.getElementById('enemy');
+const enemyProblemEl = document.getElementById('enemy-problem');
+const enemyEmojiEl = document.getElementById('enemy-emoji');
+const playerEl = document.getElementById('player');
+const gameArea = document.getElementById('game-area');
+const overlay = document.getElementById('overlay');
+const startScreen = document.getElementById('start-screen');
+const answerBar = document.getElementById('answer-bar');
+const btns = [document.getElementById('btn0'), document.getElementById('btn1'), document.getElementById('btn2')];
+
+// Generate problem based on level
+function generateProblem() {
+  let a, b;
+  switch (level) {
+    case 1:
+      a = randInt(1, 9);
+      b = randInt(1, 9);
+      break;
+    case 2:
+      a = randInt(10, 50);
+      b = randInt(1, 9);
+      break;
+    case 3:
+      a = randInt(10, 70);
+      b = randInt(10, 29);
+      // keep answer <= 99
+      if (a + b > 99) b = 99 - a;
+      if (b < 10) b = 10;
+      break;
+    default: // level 4+
+      a = randInt(100, 200);
+      b = randInt(10, 99);
+      break;
+  }
+  return { a, b, answer: a + b };
+}
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Generate wrong answers
+function generateChoices(answer) {
+  const range = answer <= 20 ? 10 : 20;
+  const choices = [answer];
+  while (choices.length < 3) {
+    let offset = randInt(1, range);
+    if (Math.random() < 0.5) offset = -offset;
+    let wrong = answer + offset;
+    if (wrong < 0) wrong = answer + Math.abs(offset);
+    if (wrong === answer || choices.includes(wrong)) continue;
+    choices.push(wrong);
+  }
+  // Shuffle
+  for (let i = choices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [choices[i], choices[j]] = [choices[j], choices[i]];
+  }
+  return choices;
+}
+
+// Spawn enemy
+function spawnEnemy() {
+  if (!gameActive) return;
+
+  const problem = generateProblem();
+  currentAnswer = problem.answer;
+
+  enemyProblemEl.textContent = `${problem.a} + ${problem.b} = ?`;
+  enemyEmojiEl.textContent = enemyEmojis[Math.floor(Math.random() * enemyEmojis.length)];
+
+  const choices = generateChoices(currentAnswer);
+  btns.forEach((btn, i) => {
+    btn.textContent = choices[i];
+    btn.className = 'answer-btn';
+    btn.onclick = () => handleAnswer(choices[i], btn);
+  });
+
+  // Position enemy at right
+  enemyX = 0;
+  const areaWidth = gameArea.offsetWidth;
+  const enemyWidth = enemyEl.offsetWidth || 250;
+  enemyEl.style.right = (-enemyWidth) + 'px';
+  enemyEl.style.display = 'flex';
+
+  // Randomize vertical position
+  const areaHeight = gameArea.offsetHeight;
+  const margin = 80;
+  const y = randInt(margin, areaHeight - margin);
+  enemyEl.style.top = y + 'px';
+
+  // Start moving
+  clearInterval(enemyMoveInterval);
+  // Speed: slower for target audience. ~15s to cross on level 1
+  const speed = 0.4 + (level - 1) * 0.1; // % per tick
+  const tickMs = 50;
+
+  // First, pop enemy into view
+  setTimeout(() => {
+    enemyEl.classList.add('moving');
+    enemyMoveInterval = setInterval(() => {
+      if (!gameActive) { clearInterval(enemyMoveInterval); return; }
+      enemyX += speed;
+      const pixelPos = (enemyX / 100) * (areaWidth + enemyWidth);
+      enemyEl.style.right = (pixelPos - enemyWidth) + 'px';
+
+      // Check if enemy reached player side
+      if (pixelPos >= areaWidth - 80) {
+        clearInterval(enemyMoveInterval);
+        loseHP();
+      }
+    }, tickMs);
+  }, 300);
+
+  buttonsLocked = false;
+  answerBar.classList.remove('buttons-disabled');
+}
+
+// Handle answer
+function handleAnswer(chosen, btnEl) {
+  if (!gameActive || buttonsLocked) return;
+
+  if (chosen === currentAnswer) {
+    // Correct!
+    buttonsLocked = true;
+    answerBar.classList.add('buttons-disabled');
+    btnEl.classList.add('correct-flash');
+    clearInterval(enemyMoveInterval);
+    fireBullet(true);
+  } else {
+    // Wrong
+    btnEl.classList.add('wrong-flash');
+    showFeedback('再試試！', 'wrong');
+    setTimeout(() => btnEl.classList.remove('wrong-flash'), 400);
+  }
+}
+
+// Fire bullet animation
+function fireBullet(isCorrect) {
+  const bullet = document.createElement('div');
+  bullet.className = 'bullet' + (isCorrect ? '' : ' miss');
+
+  const playerRect = playerEl.getBoundingClientRect();
+  const gameRect = gameArea.getBoundingClientRect();
+  const enemyRect = enemyEl.getBoundingClientRect();
+
+  const startX = playerRect.right - gameRect.left;
+  const startY = playerRect.top + playerRect.height / 2 - gameRect.top;
+  const endX = enemyRect.left - gameRect.left;
+  const endY = enemyRect.top + enemyRect.height / 2 - gameRect.top;
+
+  bullet.style.left = startX + 'px';
+  bullet.style.top = startY + 'px';
+
+  gameArea.appendChild(bullet);
+
+  const dist = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+  const duration = Math.min(400, dist * 0.5);
+  const angle = Math.atan2(endY - startY, endX - startX);
+  bullet.style.transform = `rotate(${angle}rad)`;
+
+  const startTime = performance.now();
+  function animateBullet(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const x = startX + (endX - startX) * t;
+    const y = startY + (endY - startY) * t;
+    bullet.style.left = x + 'px';
+    bullet.style.top = y + 'px';
+
+    if (t < 1) {
+      requestAnimationFrame(animateBullet);
+    } else {
+      bullet.remove();
+      if (isCorrect) {
+        enemyDestroyed();
+      }
+    }
+  }
+  requestAnimationFrame(animateBullet);
+}
+
+// Enemy destroyed
+function enemyDestroyed() {
+  // Explosion
+  const rect = enemyEl.getBoundingClientRect();
+  const gameRect = gameArea.getBoundingClientRect();
+  const exp = document.createElement('div');
+  exp.className = 'explosion';
+  exp.textContent = '💥';
+  exp.style.left = (rect.left - gameRect.left + rect.width / 2) + 'px';
+  exp.style.top = (rect.top - gameRect.top + rect.height / 2) + 'px';
+  gameArea.appendChild(exp);
+  setTimeout(() => exp.remove(), 600);
+
+  enemyEl.style.display = 'none';
+
+  // Update score
+  score += 10 * level;
+  correctCount++;
+  updateUI();
+
+  // Feedback
+  const phrases = ['太棒了！', '答對了！', '好厲害！', '真聰明！'];
+  showFeedback(phrases[Math.floor(Math.random() * phrases.length)], 'correct');
+
+  // Check level up
+  if (correctCount >= 5 && level < 4) {
+    level++;
+    correctCount = 0;
+    updateUI();
+    setTimeout(() => showFeedback('🌟 升級了！🌟', 'levelup'), 500);
+  }
+
+  // Next enemy
+  setTimeout(spawnEnemy, 1200);
+}
+
+// Lose HP
+function loseHP() {
+  hp--;
+  updateUI();
+  enemyEl.style.display = 'none';
+
+  // Red flash
+  const flash = document.createElement('div');
+  flash.className = 'hp-loss-flash';
+  document.body.appendChild(flash);
+  setTimeout(() => flash.remove(), 500);
+
+  if (hp <= 0) {
+    gameOver();
+  } else {
+    setTimeout(spawnEnemy, 1000);
+  }
+}
+
+// Update UI
+function updateUI() {
+  scoreEl.textContent = `分數：${score}`;
+  levelEl.textContent = `等級：${level}`;
+  hpEl.textContent = '❤️'.repeat(hp) + '🖤'.repeat(Math.max(0, 3 - hp));
+}
+
+// Show feedback text
+function showFeedback(text, type) {
+  const fb = document.createElement('div');
+  fb.className = 'feedback ' + type;
+  fb.textContent = text;
+  gameArea.appendChild(fb);
+  setTimeout(() => fb.remove(), type === 'levelup' ? 1500 : 1000);
+}
+
+// Game over
+function gameOver() {
+  gameActive = false;
+  clearInterval(enemyMoveInterval);
+  document.getElementById('final-score').textContent = `分數：${score}`;
+  document.getElementById('final-level').textContent = `最高等級：${level}`;
+  overlay.classList.add('show');
+}
+
+// Start / restart
+function startGame() {
+  score = 0;
+  level = 1;
+  hp = 3;
+  correctCount = 0;
+  gameActive = true;
+  buttonsLocked = false;
+
+  updateUI();
+  overlay.classList.remove('show');
+  startScreen.classList.add('hide');
+  answerBar.classList.remove('buttons-disabled');
+  enemyEl.style.display = 'none';
+
+  clearInterval(enemyMoveInterval);
+  setTimeout(spawnEnemy, 500);
+
+  // Init simple audio context on first interaction
+  initAudio();
+}
+
+// Simple audio using Web Audio API
+let audioCtx = null;
+function initAudio() {
+  if (audioCtx) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) { /* ignore */ }
+}
+
+function playSound(freq, duration, type) {
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) { /* ignore */ }
+}
+
+// Override handlers with sound
+const origHandleAnswer = handleAnswer;
+// Patch into enemyDestroyed and loseHP for sounds
+const origEnemyDestroyed = enemyDestroyed;
+const origLoseHP = loseHP;
+
+// We'll add sounds inline instead of monkey-patching. Let's use event approach:
+document.addEventListener('click', (e) => {
+  if (!e.target.classList.contains('answer-btn')) return;
+  // Sound is played after answer check - we rely on class changes
+  setTimeout(() => {
+    if (e.target.classList.contains('correct-flash')) {
+      playSound(523, 0.1, 'sine');
+      setTimeout(() => playSound(659, 0.1, 'sine'), 100);
+      setTimeout(() => playSound(784, 0.15, 'sine'), 200);
+    } else if (e.target.classList.contains('wrong-flash')) {
+      playSound(200, 0.2, 'sawtooth');
+    }
+  }, 50);
+});
+</script>
+
+</body>
+</html>
